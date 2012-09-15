@@ -1,0 +1,100 @@
+<?php
+/**
+ * @file
+ * Main logic to send logmessages to external api.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function watchwolf_menu() {
+  $items = array();
+
+  $items['admin/config/services/watchwolf'] = array(
+    'title' => Watchwolf,
+    'description' => 'Configure watchwolf external logging.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('watchwolf_admin_settings_form'),
+    'access arguments' => array('configure watchwolf'),
+    'file' => 'includes/watchwolf.admin.inc',
+  );
+
+  return $items;
+}
+
+
+/**
+ * Implements hook_watchdog().
+ */
+function watchwolf_watchdog(array $log_entry) {
+
+  $log_entry = json_encode($log_entry);
+
+  if(variable_get('watchdog_lightweight_http', 0)) {
+    _watchwolf_log_lightweight($log_entry);
+  } else {
+    _watchwolf_log_normal($log_entry);
+  }
+}
+
+
+/**
+ * Implement hook_init().
+ */
+function watchwolf_init() {
+  if (variable_get('watchdog_log_every_page_request', 0)) {
+    watchdog('watchwolf', 'drupal page requested');
+  }
+}
+
+
+/**
+ * Helper function to perform a normal http request
+ * to the service.
+ */
+function _watchwolf_log_normal($log_entry) {
+
+  $url = variable_get('watchdog_services_url', 'http://localhost:3000/log');
+
+  $options = array(
+    'method' => 'POST',
+    'data' => "logentry=$log_entry",
+    'timeout' => variable_get('watchdog_http_timeout', 1.0),
+    'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+  );
+
+  $res = drupal_http_request($url, $options);
+}
+
+
+/**
+ * Helper function to make lightweight http
+ * requests without waiting for a response.
+ *
+ * I know, I've seen the dolphins making hoops
+ * singing "You're abusing http, this means the
+ * end of the world, we are warning you..."
+ * - but
+ * We really don't want to wait for an http
+ * response, we just want to send the logmessage
+ * and continue our business.
+ *
+ * We trade reliability and conformation to specs
+ * for performance...
+ */
+function _watchwolf_log_lightweight($log_entry) {
+
+  $port = 3000;
+  $host = 'localhost';
+  $data = "logentry=$log_entry";
+  $url = 'http://localhost:3000/log';
+  $request = "POST $url HTTP/1.1\r\n"
+    ."HOST: $host\r\n"
+    ."Content-type: application/x-www-form-urlencoded"."\r\n"
+    ."Content-Length: ".strlen($data)."\r\n"
+    ."Connection: Close\r\n\r\n"
+    .$data;
+  $fp = fsockopen($host, $port, $errno, $errstr, 5);
+  fwrite($fp, $request);
+  fclose($fp);
+}

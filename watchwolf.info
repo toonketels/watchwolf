@@ -1,0 +1,4 @@
+name = Watchwolf
+description = Sends watchdog messages to an external api.
+package = Watchwolf
+core = 7.x
