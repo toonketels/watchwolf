@@ -28,8 +28,14 @@ function watchwolf_menu() {
  */
 function watchwolf_watchdog(array $log_entry) {
 
+  // Extand default log message...
+  $log_entry['message_human'] = _watchwolf_get_human_readable_message($log_entry);
+  $log_entry['site_name'] = variable_get('site_name', 'Watchdog Anonymous');
+
+  // Convert to json object...
   $log_entry = json_encode($log_entry);
 
+  // Log it.
   if(variable_get('watchdog_lightweight_http', 0)) {
     _watchwolf_log_lightweight($log_entry);
   } else {
@@ -97,4 +103,27 @@ function _watchwolf_log_lightweight($log_entry) {
   $fp = fsockopen($host, $port, $errno, $errstr, 5);
   fwrite($fp, $request);
   fclose($fp);
+}
+
+
+/**
+ * Helper function to convert the message and
+ * variables into human readable message.
+ */
+function _watchwolf_get_human_readable_message($log_message) {
+
+  $output =  $log_message['message'];
+
+  if (isset($log_message['message']) && isset($log_message['variables'])) {
+    // Messages without variables or user specified text.
+    if ($log_message['variables'] === 'N;') {
+      $output = $log_message['message'];
+    }
+    // Message to translate with injected variables.
+    else {
+      $output = t($log_message['message'], $log_message['variables']);
+    }
+  }
+
+  return $output;
 }
